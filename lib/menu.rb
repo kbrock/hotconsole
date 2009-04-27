@@ -26,6 +26,12 @@ module HotCocoa
         edit.item :copy, :key => "c", :action => "copy:"
         edit.item :paste, :key => "v", :action => "paste:"
       end
+      main.submenu :run do |run|
+#TODO: how to bind to arrow keys?
+        run.item :run_command, :title => "Run command" #return does this. so not really needed
+        run.item :previous_command, :title => "Previous command", :key =>"\UF700", :modifiers => [:command] #up arrow
+        run.item :next_command, :title => "Next command", :key =>"\UF701", :modifiers => [:command] #down arrow
+      end
       main.submenu :view do |view|
         view.item :bigger, :key => "+", :modifiers => [:command], :action => "makeTextLarger:"
         view.item :smaller, :key => "-", :modifiers => [:command], :action => "makeTextSmaller:"

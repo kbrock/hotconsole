@@ -14,7 +14,8 @@ class EvalThread
   class Writer
     # sets the target where to write when something is written on the standard output
     def self.set_stdout_target_for_thread(target)
-      Thread.current[:_irb_stdout_target] = target
+      current_thread = Thread.current
+      current_thread[:_irb_stdout_target] = target
     end
     
     # a standard output object has only one mandatory method: write.
@@ -43,49 +44,51 @@ class EvalThread
     
     private
     
-    # the core of write/puts: tries to find the target where to
-    # write the text and calls the indicated function on it.
-    # it returns the number of characters in the given string
-    def find_target_and_call(function_name, obj)
+    def find_target
       current_thread = Thread.current
       target = current_thread[:_irb_stdout_target]
       
-      # first, if we have a target in the thread, use it
-      return target.send_on_main_thread(function_name, obj) if target
-      
       # if we do not have any target, search for a target in every thread in the ThreadGroup
-      if group = current_thread.group
+      if !target && (group = current_thread.group)
         group.list.each do |thread|
-          return target.send_on_main_thread(function_name, obj) if target = thread[:_irb_stdout_target]
+          break if target = thread[:_irb_stdout_target]
         end
       end
       
       # if we still do not have any target, try to get the most recently used and opened terminal
-      target = $terminals.last
+      target ||= $terminals.last
+    end
+
+    # the core of write/puts: tries to find the target where to
+    # write the text and calls the indicated function on it.
+    # it returns the number of characters in the given string
+    def find_target_and_call(function_name, obj)
+      target=find_target
       return target.send_on_main_thread(function_name, obj) if target
       
       # if we do not find any target, just write it on STDERR
       STDERR.send(function_name, obj)
     end
   end
+
   # replace Ruby's standard output
   $stdout = Writer.new
   
-  # sends a command to evaluate.
+  # terminal sends a command to be evaluated.
   # the line_number is not computed internally because the empty lines
   # are not sent to the eval thread but still increase the line number
   def send_command(line_number, command)
     @queue_for_commands.push([line_number, command])
   end
   
-  # asks the thread to end.
+  # terminal asks the thread to end.
   # this operation is not immediate because if an operation is
   # still working in the thread, we want to let it finish
   def end_thread
     @queue_for_commands.push([nil, :END])
   end
   
-  # kill the evaluation thread and its children
+  # terminal asks to kill the evaluation thread and its children
   def kill_running_threads
     @thread_group.list.each do |thread|
       thread.kill if thread != @thread
@@ -93,6 +96,7 @@ class EvalThread
     @thread.kill if @thread.alive? # kill the main thread last
   end
   
+  # terminal asks if there are threads running
   def children_threads_running?
     if @thread.alive?
       @thread_group.list.count > 1

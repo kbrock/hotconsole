@@ -155,7 +155,8 @@ class EvalThread
       begin
         # eval_line must have exactly the line number where the eval call occurs
         eval_line = __LINE__; value = eval(add_underscore_assignment(command), @binding, 'hotconsole', line_num)
-        back_from_eval "=> #{value.inspect}\n"
+        #back_from_eval "=> #{value.inspect}\n"
+        @target.send_on_main_thread :back_from_eval_result, value.inspect #would like to not send inspect, but fixes 'boolean' bug
       rescue Exception => e
         backtrace = e.backtrace
         # we try to remove the backtrace of the call to eval itself

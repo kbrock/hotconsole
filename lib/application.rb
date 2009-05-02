@@ -37,7 +37,7 @@ class Terminal
     alert.beginSheetModalForWindow @window, modalDelegate: self, didEndSelector: "alertDidEnd:returnCode:contextInfo:", contextInfo: nil
     false
   end
-
+  FULL={:expand => [:window,:height]}
   def start
     @line_num = 1
     @history = [ ]
@@ -51,7 +51,35 @@ class Terminal
       frame[0] = w.frame.origin.x + 20
       frame[1] = w.frame.origin.y - 20
     end
+    #@prompt = text_view(:frame => [0,0,500,100],:layout => {:expand => [:width,:height], :start => false})
+    #?@prompt.editingDelegate = self # for ? (will only work for nstextview vs nstextfield)
+    
+    #TODO: need to set font to monaco
+    #TODO: need scroll bars (putting into scroll_view caused issues)
+
+    #TODO: need scrollbars. but this caused the text_field/view to become too small
+    #full_prompt= scroll_view(:frame => [0,0,600,100], :layout => {:expand => [:width,:height], :start => true})
+    #full_prompt.document_view = @prompt
+    #full_prompt=@prompt
+
     @window = window(:frame => frame, :title => "HotConsole") do |win|
+      win << split_view(:frame => [0,0,600,400],:horizontal => true, :layout => FULL) do |sview|
+        #set a default size. (better way to do this?
+        sview << @web_view = web_view(:frame => [0,0,200,300],:layout => FULL) do |wv|
+          wv.editingDelegate = self # for webView:doCommandBySelector:
+          wv.frameLoadDelegate = self # for webView:didFinishLoadForFrame:
+          wv.url=local_page_path
+        end
+        sview << @prompt = text_field(:frame => [0,0,500,100],:layout => FULL,
+          :on_action => Proc.new { |p|
+            perform_action(p.to_s)
+            p.text='' #@prompt.text=''
+          }) do |tf|
+            tf.setFont(font(:name=>'Monaco', :size => 16))
+        end
+      end
+      win.contentView.margin = 5
+
       win.should_close? { self.should_close? }
       win.will_close {
         $terminals.delete(self)
@@ -63,38 +91,6 @@ class Terminal
         $terminals.delete(self)
         $terminals << self
       }
-      win.contentView.margin = 0
-
-      #set a default size. (better way to do this?
-      @web_view = web_view(:frame => [0,0,200,300],:layout => {:expand => [:width, :height]})
-      @web_view.editingDelegate = self # for webView:doCommandBySelector:
-      @web_view.frameLoadDelegate = self # for webView:didFinishLoadForFrame:
-#      @web_view.mainFrame.loadHTMLString base_html, baseURL: nil
-      #@web_view.url='file:///Users/kbrock/projects/hotconsole/resources/index.html'
-      @web_view.url=blank_page_path
-      
-      #@prompt = text_view(:frame => [0,0,500,100],:layout => {:expand => [:width,:height], :start => false})
-      #?@prompt.editingDelegate = self # for ? (will only work for nstextview vs nstextfield)
-      
-      #TODO: need to set font to monaco
-      #TODO: need scroll bars (putting into scroll_view caused issues)
-      @prompt = text_field(:frame => [0,0,500,100],:layout => {:expand => [:width,:height], :start => false, :font => font(:name => "Monaco", :size => 16)},
-        :on_action => Proc.new { |p|
-          perform_action(p.to_s)
-          p.text='' #@prompt.text=''
-        })
-      #for some reason the font line above does not 
-      @prompt.setFont(font(:name=>'Monaco', :size => 16))
-
-      #TODO: need scrollbars. but this caused the text_field/view to become too small
-      #full_prompt= scroll_view(:frame => [0,0,600,100], :layout => {:expand => [:width,:height], :start => true})
-      #full_prompt.document_view = @prompt
-      full_prompt=@prompt
-
-      win << split_view(:frame => [0,0,600,400],:horizontal => true, :layout => {:expand => [:width,:height], :start =>true}) do |sview|
-        sview << @web_view
-        sview << full_prompt
-      end
     end
 
     class << @window
@@ -107,7 +103,7 @@ class Terminal
     $terminals << self
   end
   
-  def blank_page_path
+  def local_page_path
     bundle=NSBundle.mainBundle
     raise "no mainBundle" unless bundle
     fullPath=NSBundle.pathForResource("index", :ofType => "html", :inDirectory => bundle.bundlePath)
@@ -252,14 +248,15 @@ class Terminal
     command||=@prompt.to_s
     current_line_number = @line_num
 
-    new_command_div
-    write_command command #put it into the top view
-
-    @line_num += command.count("\n")+1
     if command.strip.empty?
       write_prompt
       return
     end
+
+    new_command_div
+    write_command command #put it into the top view
+
+    @line_num += command.count("\n")+1
     
     @history.push(command)
     @pos_in_history = @history.length
@@ -281,6 +278,11 @@ class Terminal
     write text
     write_prompt
   end
+  def back_from_eval_result(value)
+    return if @window_closed
+    write "=> #{value.inspect}\n" #inspect not necessary
+    write_prompt
+  end
 end
 
 class Application
@@ -290,6 +292,8 @@ class Application
       start_terminal
     end
   end
+
+  #menu options
 
   def on_new(sender)
     start_terminal

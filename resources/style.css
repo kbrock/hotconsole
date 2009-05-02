@@ -84,18 +84,19 @@ h1 {
 }
 /* @end #header */
 /* @group #content */
-#content {}
 .hentry {
 	position: relative;
 	border-bottom: 2px solid #000;
 	padding: 20px 0 13px 0;
 	margin:  0px 0 5px 0;
 }
-/* post markup */
-h3 {
+/* post markup (command) */
+h3.hentry-title {
 	font-size: 16px;
 	line-height: 20px;
-	margin: -1px 0 21px 0; /*newline below command text */
+	margin: -1px 0 1px 0; /*make bottom 21px for newline after command*/
 	font-variant: small-caps;
 }
+#hentry-content {}
+
 /* @end #content */

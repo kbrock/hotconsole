@@ -26,7 +26,7 @@ class Terminal
   #user event
   def should_close?
     # we can always close directly is nothing is running
-    return true if command_line and not @eval_thread.children_threads_running?
+    return true if @prompt.getEditable  and not @eval_thread.children_threads_running?
     
     alert = NSAlert.alloc.init
     alert.messageText = "Some code is still running in this console.\nDo you really want to close it?"
@@ -51,32 +51,22 @@ class Terminal
       frame[0] = w.frame.origin.x + 20
       frame[1] = w.frame.origin.y - 20
     end
-    #@prompt = text_view(:frame => [0,0,500,100],:layout => {:expand => [:width,:height], :start => false})
     #?@prompt.editingDelegate = self # for ? (will only work for nstextview vs nstextfield)
     
-    #TODO: need to set font to monaco
-    #TODO: need scroll bars (putting into scroll_view caused issues)
-
-    #TODO: need scrollbars. but this caused the text_field/view to become too small
-    #full_prompt= scroll_view(:frame => [0,0,600,100], :layout => {:expand => [:width,:height], :start => true})
-    #full_prompt.document_view = @prompt
-    #full_prompt=@prompt
-
     @window = window(:frame => frame, :title => "HotConsole") do |win|
-      win << split_view(:frame => [0,0,600,400],:horizontal => true, :layout => FULL) do |sview|
+      win << split_view(:frame => [0,0,600,400],:horizontal => true, :layout => FULL) do |sv|
         #set a default size. (better way to do this?
-        sview << @web_view = web_view(:frame => [0,0,200,300],:layout => FULL) do |wv|
+        sv << @web_view = web_view(:frame => [0,0,0,300],:layout => FULL) do |wv|
           wv.editingDelegate = self # for webView:doCommandBySelector:
           wv.frameLoadDelegate = self # for webView:didFinishLoadForFrame:
           wv.url=local_page_path
         end
-        sview << @prompt = text_field(:frame => [0,0,500,100],:layout => FULL,
+        sv << @prompt = text_field(:frame => [0,0,0,100],:layout => FULL,
+          :font =>font(:name=>'Monaco', :size => 16),
           :on_action => Proc.new { |p|
             perform_action(p.to_s)
             p.text='' #@prompt.text=''
-          }) do |tf|
-            tf.setFont(font(:name=>'Monaco', :size => 16))
-        end
+          })
       end
       win.contentView.margin = 5
 
@@ -207,11 +197,8 @@ class Terminal
     if obj.respond_to?(:to_ary)
       obj.each { |elem| puts elem }
     else
-      # we do not call just write because of encoding/string problems
-      # and because Ruby itself does it in two calls to write
+      # don't need to output last newline. it is in a p tag
       write obj
-      #write "\n"
-      #kb: note, since the write is putting it into a p, ignore advice and just do a single write
     end
   end
 
@@ -222,7 +209,7 @@ class Terminal
   end
   
   def begin_edition
-    #TODO disable text field
+    #TODO way to use css like stuff here?
     @prompt.setEditable(false)
     @prompt.setBackgroundColor(color(:rgb => 0x333333))
   end
@@ -289,17 +276,18 @@ class Application
   def start
     application :name => "HotConsole" do |app|
       app.delegate = self
-      start_terminal
+      on_new(nil)
     end
   end
 
   #menu options
 
   def on_new(sender)
-    start_terminal
+    Terminal.new.start
   end
 
   def on_close(sender)
+    #TODO: merge into tell_main_win
     w = NSApp.mainWindow
     if w
       w.performClose self
@@ -325,10 +313,6 @@ class Application
   end
 
   private
-
-  def start_terminal
-    Terminal.new.start
-  end
   
   def tell_main_win(*args)
     w = NSApp.mainWindow

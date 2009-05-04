@@ -117,12 +117,6 @@ class EvalThread
 
   private
   
-  # tells the target eval has finished and it can show a new prompt
-  def back_from_eval(text)
-    @target.send_on_main_thread :back_from_eval, text
-  end
-  
-  
   UNDERSCORE_ASSIGNMENT = '_ = begin %s end'.freeze
   
   def add_underscore_assignment(command)
@@ -167,7 +161,7 @@ class EvalThread
         elsif i
           backtrace = backtrace[0..i-1]
         end
-        back_from_eval "#{e.class.name}: #{e.message}\n" + (backtrace.empty? ? '' : "#{backtrace.join("\n")}\n")
+        @target.send_on_main_thread :back_from_eval, "#{e.class.name}: #{e.message}\n" + (backtrace.empty? ? '' : "#{backtrace.join("\n")}\n")
       end
     end
   end
